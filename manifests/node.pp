@@ -86,7 +86,7 @@ define cobbler::node(
                     else
                         action='add --netboot-enabled=true'
                     fi;
- 		    cobbler system \\\${action} \
+ 		    cobbler system \${action} \
 				--name='${name}' \
 				--mac-address='${mac}' \
 				--profile='${profile}' \
@@ -100,8 +100,8 @@ define cobbler::node(
 				--power-pass=${power_password} \
 				--power-id=${power_id} \
 				--power-type=${power_type}",
-		provider => shell,
 		path => "/usr/bin:/bin",
+    provider => shell,
                 require => [Package[cobbler],Cobbler::Ubuntu::Preseed[$preseed],Anchor["cobbler-profile-${profile}"]],
 		notify => Exec["cobbler-sync"],
 	}
