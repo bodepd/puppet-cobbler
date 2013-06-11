@@ -139,8 +139,7 @@ class cobbler(
 	}
 
 	exec { "cobbler-sync":
-		command => "/usr/bin/cobbler sync",
-		provider => shell,
+		command => "/bin/sleep 5; /usr/bin/cobbler sync",
 		refreshonly => true,
 		require => Service[cobbler],
 	}
