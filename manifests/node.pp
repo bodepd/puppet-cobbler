@@ -55,6 +55,7 @@ define cobbler::node(
   $profile,
   $ip,
   $domain,
+  # AFAICT,this doesnt do anything, but it was left here for backward compat
   $node_type = "",
   $preseed,
   $power_address = "",
@@ -67,6 +68,10 @@ define cobbler::node(
   $log_host = '',
   $extra_host_aliases = []
 ) {
+
+  if $node_type != '' {
+    warning("You have set a node_type for cobbler::node, this paramter does nothing and will be deprecated")
+  }
 
   $preseed_file= '/etc/cobbler/preseeds/$preseed'
 
@@ -92,22 +97,22 @@ define cobbler::node(
     $kernel_options['netcfg/get_gateway']      = $cobbler::ip
     $kernel_options['netcfg/no_default_route'] = 'true'
   }
-  
+
   if($log_host) {
     $kernel_options['log_host']   = $log_host
     $kernel_options['BOOT_DEBUG'] = '2'
   }
-  
+
   if($serial) {
     $kernel_options['console'] = 'ttyS0,9600'
-  } 
+  }
 
   cobblersystem { $name:
     ensure         => present,
     # should this alwasy be true?
     hostname       => "${name}.${domain}",
     netboot        => true,
-    profile        => $profile,    
+    profile        => $profile,
     kickstart      => $preseed_file,
     power_type     => $power_type,
     power_user     => $power_user,
@@ -122,7 +127,7 @@ define cobbler::node(
                     ip_address  => $ip,
                     netmask     => $cobbler::node_netmask,
                     dns_name    => "${name}.${domain}"
-                  },    
+                  },
     },
     notify         => Exec['cobbler-sync'],
   }

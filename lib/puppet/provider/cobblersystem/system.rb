@@ -6,11 +6,11 @@ Puppet::Type.type(:cobblersystem).provide(:system) do
   #
   desc 'Support for managing the Cobbler systems'
 
-  commands :cobbler => '/usr/bin/cobbler'
+  optional_commands :cobbler => '/usr/bin/cobbler'
 
   mk_resource_methods
 
-  def self.instances    
+  def self.instances
     keys = []
     # connect to cobbler server on localhost
     cobblerserver = XMLRPC::Client.new2('http://127.0.0.1/cobbler_api')
@@ -27,7 +27,6 @@ Puppet::Type.type(:cobblersystem).provide(:system) do
           inet_hash["#{iface_name}"]["#{key}"] = val unless val == '' or val == []
         end
       end
-
       keys << new(
         :name           => member['name'],
         :ensure         => :present,
@@ -55,32 +54,6 @@ Puppet::Type.type(:cobblersystem).provide(:system) do
         resource.provider = prov
       end
     end
-  end
-
-  # sets profile
-  def profile=(value)
-    cobbler('system', 'edit', '--name=' + @resource[:name], '--profile=' + value)
-    @property_hash[:profile]=(value)
-  end
-
-  # sets hostname
-  def hostname=(value)
-    cobbler('system', 'edit', '--name=' + @resource[:name], '--hostname=' + value)
-    @property_hash[:hostname]=(value)
-  end
-
-  # sets gateway
-  def gateway=(value)
-    cobbler('system', 'edit', '--name=' + @resource[:name], '--gateway=' + value)
-    @property_hash[:gateway]=(value)
-  end
-
-  # sets netboot
-  def netboot=(value)
-    tmparg='--netboot-enabled=0'
-    tmparg='--netboot-enabled=1' if value.to_s.grep(/false/i).empty?
-    cobbler('system', 'edit', '--name=' + @resource[:name], tmparg)
-    @property_hash[:netboot]=(value)
   end
 
   # sets interfaces
@@ -133,18 +106,6 @@ Puppet::Type.type(:cobblersystem).provide(:system) do
     @property_hash[:interfaces]=(value)
   end
 
-  # sets comment
-  def comment=(value)
-    cobbler('system', 'edit', '--name=' + @resource[:name], '--comment=' + value)
-    @property_hash[:comment]=(value)
-  end
-
-  # sets comment
-  def comment=(value)
-    cobbler('system', 'edit', '--name=' + @resource[:name], '--comment=' + value)
-    @property_hash[:comment]=(value)
-  end
-
   # this code dynamically creates setter methods for properties
   # b/c the implementation code is exactly the same
   [
@@ -156,31 +117,22 @@ Puppet::Type.type(:cobblersystem).provide(:system) do
     :kickstart      => 'kickstart'
   ].each do |attr, id|
      define_method(attr.to_s + "=") do |value|
-       cobbler('system', 'edit', '--name=' + @resource[:name], "--#{id}=" + value)
        @property_hash[attr] = value
      end
   end
 
   def kernel_options=(value)
-    cobbler('system', 'edit', '--name=' + @resource[:name], '--kopts=' + value)
+    new_value = "'"
+    value.each do |k, v|
+      new_value << "#{k}=#{v} "
+    end
+    new_value << "'"
+    cobbler('system', 'edit', '--name=' + @resource[:name], '--kopts=' + new_value)
     @property_hash[:kernel_options] = value
   end
 
   def create
-    # add system
-    cobbler('system', 'add', '--name=' + @resource[:name], '--profile=' + @resource[:profile])
-
-    # add hostname, gateway, interfaces, netboot
-    self.hostname   = @resource.should(:hostname)   unless self.hostname   == @resource.should(:hostname)
-    self.gateway    = @resource.should(:gateway)    unless self.gateway    == @resource.should(:gateway)
-    self.interfaces = @resource.should(:interfaces) unless self.interfaces == @resource.should(:interfaces)
-    self.netboot    = @resource.should(:netboot)    unless self.netboot    == @resource.should(:netboot)
-    self.comment    = @resource.should(:comment)    unless self.comment    == @resource.should(:comment)
-
-    # sync state
-    cobbler('sync')
-
-    # update @property_hash
+    @action = 'add'
     @property_hash[:ensure] = :absent
   end
 
@@ -194,5 +146,48 @@ Puppet::Type.type(:cobblersystem).provide(:system) do
 
   def exists?
     @property_hash[:ensure] == :present
+  end
+
+  # flush does all of the real work
+  def flush
+    args = ''
+    # first build out the argument list
+    {
+      :profile        => 'profile',
+      :hostname       => 'hostname',
+      :gateway        => 'gateway',
+      :comment        => 'comment',
+      :kickstart      => 'kickstart',
+      :power_user     => 'power-user',
+      :power_address  => 'power-address',
+      :power_password => 'power-pass',
+      :power_id       => 'power-id',
+      :power_type     => 'power-type',
+    }.each do |attr, id|
+      args << " --#{id}=#{resource[attr]} "
+    end
+    # netboot is a little special
+    if resource[:netboot]
+      args << " --netboot-enabled=1 "
+    else
+      args << " --netboot-enabled=0 "
+    end
+    # do nothing if we were destroying the resource
+    unless @action == 'destroy'
+      if @action != 'add'
+        @action = 'edit'
+      end
+      begin
+        output = cobbler('system', @action, "--name=#{resource[:name]}", args)
+      rescue Puppet::ExecutionFailure => e
+        fail("Call to cobbler system #{@action} failed with output: #{output}")
+      end
+      interfaces = resource[:interfaces] if resource[:interfaces]
+      begin
+        output = cobbler('sync')
+      rescue Puppet::ExecutionFailure => e
+        fail("Call to cobbler sync failed with output: #{output}")
+      end
+    end
   end
 end

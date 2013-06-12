@@ -115,30 +115,46 @@ cobblersystem { 'test.domain.com':
 
   newproperty(:power_address) do
     desc 'address of machine that manages power'
+    defaultto ''
   end
 
   newproperty(:power_type) do
     desc 'Power management type (impitools, ucs, etc)'
+    defaultto ''
   end
 
   newproperty(:power_user) do
     desc 'Power management username'
+    defaultto ''
   end
 
   newproperty(:power_password) do
     desc 'Power management password'
+    defaultto ''
   end
 
   newproperty(:power_id) do
     desc 'Power management port-id/name'
+    defaultto ''
   end
 
   newproperty(:kernel_options) do
+    def should_to_s(newvalue)
+      newvalue.inspect
+    end
+    def is_to_s(currentvalue)
+      currentvalue.inspect
+    end
     desc 'string of kernel options'
+    validate do |value|
+      fail('kernel_option expects a Hash') unless value.class == Hash
+    end
+    defaultto {}
   end
 
   newproperty(:kickstart) do
     desc 'file used for kickstart'
+    defaultto ''
   end
 
 end
